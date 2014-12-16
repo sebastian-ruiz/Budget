@@ -1,0 +1,42 @@
+# generated files
+bin/
+gen/
+out/
+build/
+
+# Eclipse project files
+.classpath
+.project
+
+# IDEA/Android Studio project files, because
+# the project can be imported from settings.gradle
+.idea
+*.iml
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Mac files
+.DS_Store
+
+*.class
+build/bundles/
+build/classes/
+build/dependency-cache/
+build/docs/
+build/incremental/
+build/poms/
+build/reports/
+build/resources/
+build/source/
+build/tests/
+build/test-results/
+build/tmp/
+build/ivy.xml
+build/lint*
+bin/
+gen/
+libs/
+.gradle
+

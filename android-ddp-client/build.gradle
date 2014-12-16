@@ -1,0 +1,188 @@
+apply plugin: 'signing'
+apply plugin: 'maven'
+
+group = 'com.keysolutions'
+version = '0.5.7.6'
+
+buildscript {
+   repositories {
+      mavenCentral()
+   }
+   dependencies {
+      classpath 'com.android.tools.build:gradle:1.0.0-rc2'
+   }
+}
+apply plugin: 'com.android.library'
+
+/// this overrides the default src/main gradle layout to match Eclipse's
+android {
+    compileSdkVersion 19
+    buildToolsVersion '19.1.0'
+    
+    defaultConfig {
+        targetSdkVersion 19
+        minSdkVersion 19
+        versionCode 10
+    }
+
+    sourceSets {
+        main {
+            manifest {
+                srcFile 'AndroidManifest.xml'
+            }
+            java {
+                srcDir 'src'
+            }
+            res {
+                srcDir 'res'
+            }
+            assets {
+                srcDir 'assets'
+            }
+            resources {
+                srcDir 'src'
+            }
+        }
+    }
+}
+
+
+/// add dependencies
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // use lower support libraries and compat mode so that gradle compilation wont complain:
+    // uses-sdk:minSdkVersion 10 cannot be smaller than version L declared in library com.android.support:appcompat-v7:21.0.0-rc1
+    // solution here http://stackoverflow.com/questions/24436678/manifest-merger-failed-uses-sdkminsdkversion-10-cannot-be-smaller-than-versio
+//    compile "com.android.support:support-v4:21.0.0-rc1"
+    compile 'com.android.support:appcompat-v7:20.+'
+    compile 'com.android.support:support-v4:20.+'
+    compile "com.keysolutions:java-ddp-client:[0.5.7,)"
+}
+
+/// add tasks for Maven Central
+//jar method lives inside java plugin which we can't include because it conflicts w/ Android plugin :-P
+//jar {
+//    manifest {
+//        attributes 'Implementation-Title': 'Android DDP Client Library', 'Implementation-Version': version
+//    }
+//}
+
+
+task makeJavadoc(type:Exec) {
+    commandLine 'javadoc', '-d', 'build/docs/javadoc', '-sourcepath', './src', '-subpackages', 'com'
+    standardOutput = new ByteArrayOutputStream()
+    errorOutput = new ByteArrayOutputStream()
+    //extension method makeJavadoc.output() can be used to obtain the output:
+    ext.output = {
+        return standardOutput.toString()
+    }
+    ext.error = {
+        return errorOutput.toString()
+    }
+}
+
+// can't ", dependsOn: javadoc" because that is in the java plugin which isn't compatible w/ Android plugin :-P
+task javadocJar(type: Jar, dependsOn: makeJavadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+//* BB MOD - commented out
+// ERROR: Error:(90, 0) Could not find property 'allSource' on source set main.
+task sourcesJar(type: Jar) {
+    //from android.sourceSets.main.allSource  // original that fires error
+    // solution compile all type of sources independently >> https://code.google.com/p/android/issues/detail?id=71174
+    from android.sourceSets.main.java,
+            android.sourceSets.main.res,
+            android.sourceSets.main.assets,
+            android.sourceSets.main.renderscript,
+            android.sourceSets.main.jni,
+            android.sourceSets.main.jniLibs
+    classifier = 'sources'
+}
+//*/
+
+
+uploadArchives {
+    repositories.mavenDeployer {
+        beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+ 
+        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+            // original version
+            //authentication(userName: sonatypeUsername, password: sonatypePassword)
+            // BB mod - solved compilation error shown in github issue: https://github.com/kenyee/android-ddp-client/issues/1
+                // with StackOverflow answer from JBNizet - http://stackoverflow.com/questions/17311070/gradle-how-to-share-a-build-gradle-which-contains-information-i-am-the-only-one
+                // and his sample code https://github.com/Ninja-Squad/DbSetup/blob/master/build.gradle
+            // the solution implies that in android-ddp-client/project.properties you put 2 variables sonatypeUsername= and sonatypePassword= ... even with no values
+            authentication(userName: project.properties['sonatypeUsername'], password: project.properties['sonatypePassword'])
+        }
+ 
+        pom.project {
+            name 'android-ddp-client'
+            packaging 'aar'
+            description 'AndroidDDPClient is an Android library for native apps that talk to the Meteor.js framework'
+            url 'https://github.com/kenyee/android-ddp-client'
+ 
+            scm {
+                url 'scm:git@github.com:kenyee/android-ddp-client.git'
+                connection 'scm:git@github.com:kenyee/android-ddp-client.git'
+                developerConnection 'scm:git@github.com:kenyee/android-ddp-client.git'
+            }
+ 
+            licenses {
+                license {
+                   name 'The Apache Software License, Version 2.0'
+                   url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                   distribution 'repo'
+                }
+            }
+ 
+            developers {
+                developer {
+                    id 'kenyee'
+                    name 'Ken Yee'
+                }
+            }
+        }
+    }
+}
+
+artifacts {
+    archives javadocJar
+    archives sourcesJar
+}
+signing {
+    sign configurations.archives
+}
+
+
+// use this for testing pom.xml generation
+task writeNewPom << {
+    pom {
+        project {
+            inceptionYear '2013'
+            licenses {
+                license {
+                    name 'The Apache Software License, Version 2.0'
+                    url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    distribution 'repo'
+                }
+            }
+        }
+        /* converts Gradle dynamic dependency syntax 
+        whenConfigured { generatedPom ->
+          generatedPom.dependencies.each { mavenDep ->
+            if (isDynamic(mavenDep)) {
+              mavenDep.version = '[' + mavenDep.version[0..-2] + ',)'
+            }
+          }
+        }
+        */
+
+    }.writeTo("$buildDir/newpom.xml")
+}
+
+
